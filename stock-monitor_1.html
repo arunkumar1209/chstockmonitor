@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Monitor Agent</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+
+:root {
+  --bg:#08080e; --surface:#11111c; --surface2:#181825; --border:#252538;
+  --accent:#00ff88; --accent2:#ff6b35; --accent3:#4d9fff; --crypto:#f7931a;
+  --red:#ff4757; --green:#00ff88; --text:#e8e8f0; --muted:#5a5a78;
+  --mono:'Space Mono',monospace; --sans:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+.wrap{max-width:1200px;margin:0 auto;padding:20px 24px;position:relative;z-index:1}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:44px;height:44px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.logo h1{font-size:21px;font-weight:800;letter-spacing:-.5px}
+.logo h1 span{color:var(--accent)}
+.logo p{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.live-badge{display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:20px;border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--accent);animation:blink 1.8s infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,255,136,.5)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(0,255,136,0)}}
+
+/* NOTIF BANNER */
+#nb{background:linear-gradient(120deg,#1a130a,#1a1008);border:1px solid rgba(255,107,53,.35);border-radius:12px;padding:13px 18px;display:flex;align-items:center;gap:12px;margin-bottom:18px}
+#nb.gone{display:none}
+#nb strong{font-size:13px;color:var(--accent2);display:block;margin-bottom:2px}
+#nb p{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.slbl{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.sval{font-size:22px;font-weight:800}
+.cg{color:var(--green)}.cr{color:var(--red)}.cb{color:var(--accent3)}.co{color:var(--crypto)}
+
+/* CONTROLS */
+.ctrl{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.ctrl-l{display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap}
+.sel{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 14px;border-radius:8px;font-family:var(--mono);font-size:12px;cursor:pointer;outline:none}
+.sel:focus{border-color:var(--accent)}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:8px;border:none;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-g{background:var(--accent);color:#000}.btn-g:hover{background:#00e87a;transform:translateY(-1px)}
+.btn-r{background:var(--red);color:#fff}.btn-r:hover{filter:brightness(1.1)}
+.btn-o{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:5px 11px;font-size:11px}.btn-ico{padding:5px 9px;font-size:12px}
+
+/* ADD FORM */
+.form-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:18px}
+.form-ttl{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.fg{display:flex;flex-direction:column;gap:5px;flex:1;min-width:90px}
+.fg label{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+input.inp,.sel.inp-s{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 13px;border-radius:8px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;width:100%}
+input.inp:focus{border-color:var(--accent)}
+input.inp::placeholder{color:var(--muted)}
+.sel.inp-s{cursor:pointer}
+.sel.inp-s:focus{border-color:var(--accent)}
+
+/* TABS */
+.tabs{display:flex;gap:3px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:11px;font-weight:600;cursor:pointer;border:1px solid transparent;border-bottom:none;font-family:var(--mono);color:var(--muted);transition:all .2s;background:transparent;position:relative;top:1px}
+.tab:hover{color:var(--text)}
+.tab.on{background:var(--surface);border-color:var(--border);color:var(--text);border-bottom-color:var(--surface)}
+.tc{display:inline-block;margin-left:5px;background:var(--surface2);border-radius:10px;padding:1px 7px;font-size:9px;color:var(--muted)}
+.tab.on .tc{background:var(--border);color:var(--text)}
+
+/* WATCHLIST HEADER */
+.wlh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.wlh h2{font-size:14px;font-weight:800}
+.wlh span{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.cols{display:grid;grid-template-columns:88px 1fr 108px 88px 95px 105px 75px 40px;gap:10px;padding:0 14px 7px;font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);margin-bottom:7px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:5px;display:grid;grid-template-columns:88px 1fr 108px 88px 95px 105px 75px 40px;gap:10px;padding:12px 14px;align-items:center;transition:border-color .25s;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border);transition:background .3s}
+.card.sb{border-color:rgba(0,255,136,.2)}.card.sb::before{background:var(--green)}
+.card.ss{border-color:rgba(255,71,87,.2)}.card.ss::before{background:var(--red)}
+.card.sl::before{background:var(--accent3);animation:blink 1s infinite}
+.card.cc::before{background:var(--crypto)}
+.card.sb.cc{border-color:rgba(247,147,26,.25)}
+
+.tkr{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)}
+.tkr.cr2{color:var(--crypto)}
+.cat-t{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+.c-stk{background:rgba(77,159,255,.12);color:var(--accent3)}
+.c-etf{background:rgba(0,255,136,.12);color:var(--green)}
+.c-cry{background:rgba(247,147,26,.12);color:var(--crypto)}
+
+.nm{font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.tgt{font-size:10px;font-family:var(--mono);color:var(--muted);line-height:1.7;margin-top:2px}
+.tgt .bt{color:var(--green)}.tgt .st{color:var(--red)}
+
+.price{font-family:var(--mono);font-size:15px;font-weight:700;text-align:right}
+.chg{font-family:var(--mono);font-size:10px;padding:4px 7px;border-radius:6px;text-align:center;font-weight:700}
+.chg.up{background:rgba(0,255,136,.1);color:var(--green)}.chg.dn{background:rgba(255,71,87,.1);color:var(--red)}.chg.na{color:var(--muted)}
+
+.pnl{font-family:var(--mono);font-size:11px;text-align:center}
+
+.badge{padding:4px 9px;border-radius:20px;font-size:10px;font-weight:700;font-family:var(--mono);text-align:center;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.bb{background:rgba(0,255,136,.15);color:var(--green);border:1px solid rgba(0,255,136,.3)}
+.bs{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3)}
+.bh{background:rgba(90,90,120,.12);color:var(--muted);border:1px solid var(--border)}
+.bl{background:rgba(77,159,255,.15);color:var(--accent3);border:1px solid rgba(77,159,255,.3)}
+.be{background:rgba(255,71,87,.08);color:var(--red);border:1px solid rgba(255,71,87,.2);font-size:9px}
+
+.lct{font-size:9px;color:var(--muted);font-family:var(--mono)}
+
+/* LOG */
+.log-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-top:18px;max-height:240px;overflow-y:auto}
+.log-ttl{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.lr{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);animation:fu .3s ease}
+@keyframes fu{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.lr:last-child{border-bottom:none}
+.lt{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;margin-top:1px}
+.lm{font-size:12px;flex:1;line-height:1.5}.lm strong{color:var(--accent)}
+.empty{text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px;padding:18px 0}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;right:22px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:13px 18px;max-width:330px;display:flex;align-items:center;gap:12px;z-index:9999;transform:translateY(100px);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 32px rgba(0,0,0,.6)}
+#toast.show{transform:none;opacity:1}
+#toast.buy{border-color:rgba(0,255,136,.4)}
+#toast.sell{border-color:rgba(255,71,87,.4)}
+#toast.crypto{border-color:rgba(247,147,26,.4)}
+.ti{font-size:22px}.tb strong{font-size:13px;display:block;margin-bottom:2px}.tb p{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+.footer{text-align:center;margin-top:20px;font-size:10px;color:var(--muted);font-family:var(--mono);line-height:2}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media(max-width:800px){
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .cols,.card{grid-template-columns:75px 1fr 90px 80px 36px}
+  .cols>*:nth-child(n+4):not(:nth-child(5)):not(:nth-child(8)),.card>*:nth-child(n+4):not(:nth-child(5)):not(:nth-child(8)){display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div>
+      <h1>Stock <span>Monitor</span> Agent</h1>
+      <p>Stocks · ETFs · Crypto — Smart alerts, real-time prices</p>
+    </div>
+  </div>
+  <div class="live-badge">
+    <div class="dot" id="dot"></div>
+    <span id="stxt">Idle</span>
+  </div>
+</header>
+
+<div id="nb">
+  <span style="font-size:22px">🔔</span>
+  <div style="flex:1">
+    <strong>Enable Browser Notifications</strong>
+    <p>Get real-time alerts when buy/sell targets are hit — even in other tabs.</p>
+  </div>
+  <button class="btn btn-g" onclick="askNotif()">Enable Alerts</button>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="slbl">Watching</div><div class="sval cb" id="s0">0</div></div>
+  <div class="stat"><div class="slbl">🟢 Buy Signals</div><div class="sval cg" id="s1">0</div></div>
+  <div class="stat"><div class="slbl">🔴 Sell Signals</div><div class="sval cr" id="s2">0</div></div>
+  <div class="stat"><div class="slbl">₿ Crypto</div><div class="sval co" id="s3">0</div></div>
+  <div class="stat"><div class="slbl">Alerts Sent</div><div class="sval" id="s4">0</div></div>
+</div>
+
+<div class="ctrl">
+  <div class="ctrl-l">
+    <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">Refresh every:</span>
+    <select class="sel" id="isel">
+      <option value="30000">30 seconds</option>
+      <option value="60000" selected>1 minute</option>
+      <option value="300000">5 minutes</option>
+      <option value="900000">15 minutes</option>
+    </select>
+  </div>
+  <button class="btn btn-g" id="btog" onclick="toggleMon()">▶ Start Monitoring</button>
+  <button class="btn btn-o" onclick="refreshAll()">↻ Refresh Now</button>
+  <button class="btn btn-o" onclick="clearLog()">🗑 Clear Log</button>
+</div>
+
+<div class="form-box">
+  <div class="form-ttl">➕ Add Asset to Watchlist</div>
+  <div class="form-row">
+    <div class="fg" style="max-width:100px"><label>Ticker</label><input class="inp" id="ft" placeholder="e.g. AAPL" style="text-transform:uppercase"></div>
+    <div class="fg" style="max-width:100px"><label>Type</label>
+      <select class="sel inp-s" id="ftype">
+        <option value="stock">Stock</option>
+        <option value="etf">ETF</option>
+        <option value="crypto">Crypto</option>
+      </select>
+    </div>
+    <div class="fg"><label>Buy Below ($)</label><input class="inp" id="fb" type="number" placeholder="e.g. 150"></div>
+    <div class="fg"><label>Sell Above ($)</label><input class="inp" id="fs" type="number" placeholder="e.g. 272"></div>
+    <div class="fg"><label>Entry Price ($)</label><input class="inp" id="fe" type="number" placeholder="Optional"></div>
+    <button class="btn btn-g" onclick="addItem()" style="align-self:flex-end">Add</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-c="all" onclick="setTab('all')">All <span class="tc" id="tc0">0</span></button>
+  <button class="tab" data-c="stock" onclick="setTab('stock')">📈 Stocks <span class="tc" id="tc1">0</span></button>
+  <button class="tab" data-c="etf" onclick="setTab('etf')">🗂 ETFs <span class="tc" id="tc2">0</span></button>
+  <button class="tab" data-c="crypto" onclick="setTab('crypto')">₿ Crypto <span class="tc" id="tc3">0</span></button>
+</div>
+
+<div class="wlh">
+  <h2 id="wlt">All Assets</h2>
+  <span id="lrt">Never refreshed</span>
+</div>
+<div class="cols">
+  <div>Symbol</div><div>Name / Targets</div>
+  <div style="text-align:right">Price</div><div style="text-align:center">Change</div>
+  <div style="text-align:center">P&L</div><div style="text-align:center">Signal</div>
+  <div>Checked</div><div></div>
+</div>
+<div id="wl"></div>
+
+<div class="log-box">
+  <div class="log-ttl">📋 Alert Log</div>
+  <div id="log"><div class="empty">No alerts yet. Start monitoring to see activity.</div></div>
+</div>
+
+<div class="footer">
+  ⚠️ Prices via Yahoo Finance (15-min delayed for stocks, near-real-time for crypto). Educational purposes only.<br>
+  Not financial advice. Keep this tab open for continuous monitoring.
+</div>
+</div>
+
+<div id="toast">
+  <div class="ti" id="tico">📊</div>
+  <div class="tb"><strong id="tttl"></strong><p id="tmsg"></p></div>
+</div>
+
+<script>
+// ── ALL ASSETS ────────────────────────────────────────────────────────────────
+const DEFAULTS = [
+  // Previous conversation stocks
+  {ticker:'NVDA',  name:'Nvidia',            cat:'stock', buyBelow:150,    sellAbove:272,   entry:180 },
+  {ticker:'TSLA',  name:'Tesla',             cat:'stock', buyBelow:320,    sellAbove:458,   entry:403 },
+  {ticker:'GOOGL', name:'Alphabet',          cat:'stock', buyBelow:250,    sellAbove:377,   entry:299 },
+  {ticker:'PLTR',  name:'Palantir',          cat:'stock', buyBelow:130,    sellAbove:205,   entry:153 },
+  {ticker:'CRWV',  name:'CoreWeave',         cat:'stock', buyBelow:60,     sellAbove:100,   entry:91  },
+  // New stocks
+  {ticker:'CVX',   name:'Chevron',           cat:'stock', buyBelow:130,    sellAbove:175,   entry:null},
+  {ticker:'XOM',   name:'ExxonMobil',        cat:'stock', buyBelow:100,    sellAbove:145,   entry:null},
+  {ticker:'NBIS',  name:'Nebius Group',      cat:'stock', buyBelow:70,     sellAbove:150,   entry:null},
+  {ticker:'MSFT',  name:'Microsoft',         cat:'stock', buyBelow:360,    sellAbove:500,   entry:null},
+  {ticker:'SOLS',  name:'Solaris Energy',    cat:'stock', buyBelow:18,     sellAbove:35,    entry:null},
+  {ticker:'CRML',  name:'Crimson Lithium',   cat:'stock', buyBelow:2,      sellAbove:6,     entry:null},
+  {ticker:'HOOD',  name:'Robinhood Markets', cat:'stock', buyBelow:35,     sellAbove:65,    entry:null},
+  {ticker:'BAESY', name:'BAE Systems ADR',   cat:'stock', buyBelow:30,     sellAbove:50,    entry:null},
+  {ticker:'ORCL',  name:'Oracle',            cat:'stock', buyBelow:150,    sellAbove:220,   entry:null},
+  {ticker:'MU',    name:'Micron Technology', cat:'stock', buyBelow:80,     sellAbove:130,   entry:null},
+  {ticker:'TGT',   name:'Target',            cat:'stock', buyBelow:100,    sellAbove:155,   entry:null},
+  {ticker:'DUK',   name:'Duke Energy',       cat:'stock', buyBelow:95,     sellAbove:130,   entry:null},
+  {ticker:'RIVN',  name:'Rivian Automotive', cat:'stock', buyBelow:10,     sellAbove:22,    entry:null},
+  {ticker:'AMZN',  name:'Amazon',            cat:'stock', buyBelow:180,    sellAbove:260,   entry:null},
+  {ticker:'TSM',   name:'Taiwan Semiconductor',cat:'stock',buyBelow:140,   sellAbove:220,   entry:null},
+  {ticker:'SNOW',  name:'Snowflake',         cat:'stock', buyBelow:130,    sellAbove:220,   entry:null},
+  // ETFs
+  {ticker:'VOO',   name:'Vanguard S&P 500',  cat:'etf',   buyBelow:470,    sellAbove:580,   entry:null},
+  {ticker:'VTI',   name:'Vanguard Total Mkt',cat:'etf',   buyBelow:220,    sellAbove:290,   entry:null},
+  {ticker:'QQQ',   name:'Invesco NASDAQ-100',cat:'etf',   buyBelow:440,    sellAbove:560,   entry:null},
+  {ticker:'IAU',   name:'iShares Gold ETF',  cat:'etf',   buyBelow:88,     sellAbove:110,   entry:null},
+  {ticker:'BND',   name:'Vanguard Bond ETF', cat:'etf',   buyBelow:70,     sellAbove:82,    entry:null},
+  {ticker:'VEA',   name:'Vanguard Intl ETF', cat:'etf',   buyBelow:45,     sellAbove:58,    entry:null},
+  {ticker:'AAAU',  name:'Goldman Sachs Gold',cat:'etf',   buyBelow:22,     sellAbove:28,    entry:null},
+  // Crypto (Yahoo Finance format)
+  {ticker:'BTC-USD',   name:'Bitcoin',         cat:'crypto', buyBelow:70000,  sellAbove:110000, entry:null},
+  {ticker:'XRP-USD',   name:'XRP / Ripple',    cat:'crypto', buyBelow:1.5,    sellAbove:4.0,    entry:null},
+  {ticker:'TRUMP-USD', name:'TRUMP Meme Coin', cat:'crypto', buyBelow:8,      sellAbove:25,     entry:null},
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let wl=[], monitoring=false, timer=null, alertCnt=0, curTab='all', notifPerm=Notification.permission;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+function init(){
+  wl = DEFAULTS.map(d=>({...d,price:null,change:null,changePct:null,lastChecked:null,signal:'idle',alerted:false,id:Math.random().toString(36).slice(2)}));
+  render(); stats();
+  if(notifPerm==='granted') document.getElementById('nb').classList.add('gone');
+}
+
+// ── NOTIF ─────────────────────────────────────────────────────────────────────
+async function askNotif(){
+  const p=await Notification.requestPermission(); notifPerm=p;
+  if(p==='granted'){document.getElementById('nb').classList.add('gone');toast('✅','Notifications On!','Alerts pop up even in other tabs.','buy');addLog('🔔','Browser notifications enabled.');}
+  else toast('❌','Blocked','In-app toasts will still show.','');
+}
+
+function notify(title,body,type){
+  alertCnt++; document.getElementById('s4').textContent=alertCnt;
+  const ico=type==='buy'?'🟢':type==='crypto'?'₿':'🔴';
+  if(notifPerm==='granted'){try{new Notification(`${ico} ${title}`,{body,requireInteraction:true,tag:title})}catch(e){}}
+  toast(ico,title,body,type);
+  addLog(ico,`<strong>${title}</strong> — ${body}`);
+}
+
+function toast(ico,ttl,msg,type){
+  const el=document.getElementById('toast');
+  document.getElementById('tico').textContent=ico;
+  document.getElementById('tttl').textContent=ttl;
+  document.getElementById('tmsg').textContent=msg;
+  el.className=`show ${type}`; clearTimeout(el._t);
+  el._t=setTimeout(()=>el.className='',5500);
+}
+
+function addLog(ico,msg){
+  const box=document.getElementById('log');
+  const e=box.querySelector('.empty'); if(e) e.remove();
+  const t=new Date().toLocaleTimeString();
+  const row=document.createElement('div'); row.className='lr';
+  row.innerHTML=`<span class="lt">${t}</span><span style="font-size:15px">${ico}</span><span class="lm">${msg}</span>`;
+  box.insertBefore(row,box.firstChild);
+  while(box.children.length>60) box.removeChild(box.lastChild);
+}
+
+function clearLog(){document.getElementById('log').innerHTML='<div class="empty">Log cleared.</div>';alertCnt=0;document.getElementById('s4').textContent='0';}
+
+// ── FETCH ─────────────────────────────────────────────────────────────────────
+async function fetchPrice(ticker){
+  for(const h of['query1','query2']){
+    try{
+      const r=await fetch(`https://${h}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1m&range=1d`,{mode:'cors'});
+      if(!r.ok) continue;
+      const d=await r.json();
+      const meta=d?.chart?.result?.[0]?.meta; if(!meta) continue;
+      const price=meta.regularMarketPrice??meta.previousClose;
+      const prev=meta.chartPreviousClose??meta.previousClose;
+      const change=price-prev, changePct=prev?(change/prev)*100:0;
+      return{price,change,changePct};
+    }catch{continue}
+  }
+  return null;
+}
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+// ── MONITOR ───────────────────────────────────────────────────────────────────
+async function refreshAll(){
+  addLog('🔄',`Fetching prices for ${wl.length} assets...`);
+  for(let i=0;i<wl.length;i++){
+    const s=wl[i]; s.signal='loading'; renderCard(i);
+    const d=await fetchPrice(s.ticker);
+    if(d){
+      s.price=d.price; s.change=d.change; s.changePct=d.changePct;
+      s.lastChecked=new Date().toLocaleTimeString();
+      const ns=s.price<=s.buyBelow?'buy':s.price>=s.sellAbove?'sell':'hold';
+      if(!s.alerted&&(ns==='buy'||ns==='sell')){
+        const disp=s.ticker.replace('-USD','');
+        notify(`${ns==='buy'?'🟢 BUY':'🔴 SELL'} SIGNAL: ${disp}`,
+          `$${fmtP(s.price,s.cat==='crypto')} ${ns==='buy'?'below buy target':'hit sell target'} of $${ns==='buy'?s.buyBelow.toLocaleString():s.sellAbove.toLocaleString()}`,
+          s.cat==='crypto'?'crypto':ns);
+        s.alerted=true;
+      }
+      if(ns==='hold') s.alerted=false;
+      s.signal=ns;
+    }else{s.signal='error';s.lastChecked=new Date().toLocaleTimeString();}
+    renderCard(i); await sleep(260);
+  }
+  document.getElementById('lrt').textContent=`Updated: ${new Date().toLocaleTimeString()}`;
+  stats();
+}
+
+function toggleMon(){monitoring?stopMon():startMon();}
+
+function startMon(){
+  monitoring=true;
+  const ms=parseInt(document.getElementById('isel').value);
+  document.getElementById('btog').textContent='⏹ Stop Monitoring';
+  document.getElementById('btog').className='btn btn-r';
+  document.getElementById('dot').className='dot live';
+  document.getElementById('stxt').textContent='Live';
+  addLog('▶️',`Monitoring started — refreshing every ${ms/1000}s`);
+  refreshAll(); timer=setInterval(refreshAll,ms);
+}
+
+function stopMon(){
+  monitoring=false; clearInterval(timer);
+  document.getElementById('btog').textContent='▶ Start Monitoring';
+  document.getElementById('btog').className='btn btn-g';
+  document.getElementById('dot').className='dot';
+  document.getElementById('stxt').textContent='Idle';
+  addLog('⏹','Monitoring paused.');
+}
+
+document.getElementById('isel').addEventListener('change',()=>{if(monitoring){stopMon();startMon();}});
+
+// ── ADD / REMOVE ──────────────────────────────────────────────────────────────
+function addItem(){
+  let ticker=document.getElementById('ft').value.trim().toUpperCase();
+  const cat=document.getElementById('ftype').value;
+  const buy=parseFloat(document.getElementById('fb').value);
+  const sell=parseFloat(document.getElementById('fs').value);
+  const entry=parseFloat(document.getElementById('fe').value)||null;
+  if(!ticker) return toast('⚠️','Missing ticker','Enter a symbol.','');
+  if(!buy||!sell) return toast('⚠️','Missing targets','Enter buy and sell targets.','');
+  if(cat==='crypto'&&!ticker.endsWith('-USD')) ticker+='-USD';
+  const disp=ticker.replace('-USD','');
+  if(wl.find(s=>s.ticker===ticker)) return toast('⚠️','Already watching',`${disp} is in your watchlist.`,'');
+  wl.push({ticker,name:disp,cat,buyBelow:buy,sellAbove:sell,entry,price:null,change:null,changePct:null,lastChecked:null,signal:'idle',alerted:false,id:Math.random().toString(36).slice(2)});
+  ['ft','fb','fs','fe'].forEach(id=>document.getElementById(id).value='');
+  render(); stats();
+  addLog('➕',`Added <strong>${disp}</strong> (${cat}) — Buy &lt; $${buy.toLocaleString()}, Sell &gt; $${sell.toLocaleString()}`);
+  fetchAndUp(wl.length-1);
+}
+
+function removeItem(idx){
+  const disp=wl[idx].ticker.replace('-USD','');
+  addLog('🗑️',`Removed <strong>${disp}</strong>`);
+  wl.splice(idx,1); render(); stats();
+}
+
+async function fetchAndUp(idx){
+  const s=wl[idx]; if(!s) return;
+  s.signal='loading'; renderCard(idx);
+  const d=await fetchPrice(s.ticker);
+  if(d){s.price=d.price;s.change=d.change;s.changePct=d.changePct;s.lastChecked=new Date().toLocaleTimeString();s.signal=s.price<=s.buyBelow?'buy':s.price>=s.sellAbove?'sell':'hold';}
+  else{s.signal='error';s.lastChecked=new Date().toLocaleTimeString();}
+  renderCard(idx); stats();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function setTab(c){
+  curTab=c;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.c===c));
+  const T={all:'All Assets',stock:'Stocks',etf:'ETFs',crypto:'Crypto'};
+  document.getElementById('wlt').textContent=T[c];
+  render();
+}
+
+// ── FORMAT ────────────────────────────────────────────────────────────────────
+function fmtP(v,isCrypto){
+  if(v==null) return '—';
+  if(isCrypto){
+    if(v>1000) return '$'+v.toLocaleString(undefined,{maximumFractionDigits:0});
+    if(v>1)    return '$'+v.toLocaleString(undefined,{maximumFractionDigits:4});
+    return '$'+v.toFixed(6);
+  }
+  return '$'+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render(){
+  const box=document.getElementById('wl'); box.innerHTML='';
+  const vis=curTab==='all'?wl:wl.filter(s=>s.cat===curTab);
+  if(!vis.length){box.innerHTML='<div class="empty" style="padding:28px">No assets in this category.</div>';return;}
+  vis.forEach(s=>{const ri=wl.indexOf(s);box.insertAdjacentHTML('beforeend',cHTML(s,ri));});
+  updTC();
+}
+
+function renderCard(idx){
+  const s=wl[idx], ex=document.getElementById('c-'+s.id);
+  if(!ex){render();return;}
+  ex.outerHTML=cHTML(s,idx);
+}
+
+function cHTML(s,idx){
+  const disp=s.ticker.replace('-USD','');
+  const ic=s.cat==='crypto';
+  const priceStr=fmtP(s.price,ic);
+  const chgV=s.change, pctV=s.changePct;
+  const chgStr=chgV!=null?`${chgV>=0?'+':''}${ic&&s.price>1000?chgV.toFixed(0):chgV.toFixed(2)}`:'';
+  const pctStr=pctV!=null?`${pctV>=0?'+':''}${pctV.toFixed(2)}%`:'';
+  const cc=chgV==null?'na':chgV>=0?'up':'dn';
+  const pnl=s.entry&&s.price?((s.price-s.entry)/s.entry*100):null;
+  const pnlHTML=pnl!=null?`<span style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}${pnl.toFixed(1)}%</span><br><span style="font-size:9px;color:var(--muted)">vs entry</span>`:'<span style="color:var(--muted);font-size:10px">—</span>';
+
+  let badge='',cls='';
+  if(s.signal==='buy')     {badge=`<span class="badge bb">🟢 BUY</span>`;cls='sb';}
+  else if(s.signal==='sell'){badge=`<span class="badge bs">🔴 SELL</span>`;cls='ss';}
+  else if(s.signal==='loading'){badge=`<span class="badge bl">⏳ ...</span>`;cls='sl';}
+  else if(s.signal==='error'){badge=`<span class="badge be">⚠️ No data</span>`;}
+  else if(s.signal==='idle'){badge=`<span class="badge bh" style="font-size:9px">Not fetched</span>`;}
+  else{badge=`<span class="badge bh">⚪ HOLD</span>`;}
+
+  const catTag=`<span class="cat-t ${s.cat==='crypto'?'c-cry':s.cat==='etf'?'c-etf':'c-stk'}">${s.cat==='crypto'?'₿':s.cat==='etf'?'ETF':'STK'}</span>`;
+
+  return `<div class="card ${cls}${ic?' cc':''}" id="c-${s.id}">
+    <div><div class="tkr${ic?' cr2':''}">${disp}</div>${catTag}</div>
+    <div>
+      <div class="nm">${s.name}</div>
+      <div class="tgt">Buy&lt;<span class="bt">$${s.buyBelow.toLocaleString()}</span> | Sell&gt;<span class="st">$${s.sellAbove.toLocaleString()}</span></div>
+    </div>
+    <div class="price">${priceStr}</div>
+    <div class="chg ${cc}">${chgStr}<br><span style="font-size:9px">${pctStr}</span></div>
+    <div class="pnl">${pnlHTML}</div>
+    <div style="text-align:center">${badge}</div>
+    <div class="lct">${s.lastChecked||'—'}</div>
+    <button class="btn btn-o btn-ico" onclick="removeItem(${idx})" title="Remove">✕</button>
+  </div>`;
+}
+
+function stats(){
+  document.getElementById('s0').textContent=wl.length;
+  document.getElementById('s1').textContent=wl.filter(s=>s.signal==='buy').length;
+  document.getElementById('s2').textContent=wl.filter(s=>s.signal==='sell').length;
+  document.getElementById('s3').textContent=wl.filter(s=>s.cat==='crypto').length;
+  updTC();
+}
+
+function updTC(){
+  document.getElementById('tc0').textContent=wl.length;
+  document.getElementById('tc1').textContent=wl.filter(s=>s.cat==='stock').length;
+  document.getElementById('tc2').textContent=wl.filter(s=>s.cat==='etf').length;
+  document.getElementById('tc3').textContent=wl.filter(s=>s.cat==='crypto').length;
+}
+
+init();
+</script>
+</body>
+</html>
